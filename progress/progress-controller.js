@@ -1,19 +1,31 @@
 const logger = require('../logger');
 const Progress = require('../models/progress-model');
+const Module = require('../models/module-model');
+const mongoose = require('mongoose');
 
 const addModuleToProgress = async (req, res) => {
   try {
     logger.info('[addModuleToProgress] => Add module to progress started.');
-    const { user_id } = req.user; // from auth middleware
-    const { learning_path_id, module_id } = req.body;
+    const user_id = req.user._id; // from auth middleware
+    const { module_id } = req.body;
 
-    let progress = await Progress.findOne({ user_id, learning_path_id });
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(module_id)) {
+      return res.status(400).json({ message: 'Invalid module ID' });
+    }
+
+    const module = await Module.findById(module_id);
+    if (!module) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+
+    // Find progress document by user only (no userModule_id)
+    let progress = await Progress.findOne({ user_id });
 
     if (!progress) {
       // Create new progress document
       progress = await Progress.create({
         user_id,
-        learning_path_id,
         modules: [{ module_id }],
       });
     } else {
@@ -43,20 +55,30 @@ const addModuleToProgress = async (req, res) => {
   }
 };
 
+
 const markModuleAsCompleted = async (req, res) => {
   try {
     logger.info('[markModuleAsCompleted] => Mark module as completed started.');
-    const { user_id } = req.user;
-    const { learning_path_id, module_id } = req.body;
+    const user_id = req.user._id;
+    const { module_id } = req.body;
 
-    const progress = await Progress.findOne({ user_id, learning_path_id });
+    if (!mongoose.Types.ObjectId.isValid(module_id)) {
+      return res.status(400).json({ message: 'Invalid module ID' });
+    }
+
+    const moduleExists = await Module.exists({ _id: module_id });
+    if (!moduleExists) {
+      return res.status(404).json({ message: 'Module does not exist' });
+    }
+
+    const progress = await Progress.findOne({ user_id });
 
     if (!progress) {
       return res.status(404).json({ message: 'Progress not found' });
     }
 
     const moduleProgress = progress.modules.find(
-      m => m.module_id.toString() === module_id
+      (m) => m.module_id.toString() === module_id
     );
 
     if (!moduleProgress) {
@@ -65,12 +87,13 @@ const markModuleAsCompleted = async (req, res) => {
 
     moduleProgress.isCompleted = true;
     moduleProgress.completedAt = new Date();
+    
     await progress.save();
 
     logger.info('[markModuleAsCompleted] => Mark module as completed done.');
     return res.status(200).json({
       message: 'Module marked as completed',
-      data: progress
+      data: progress,
     });
   } catch (error) {
     console.error('[markModuleAsCompleted]', error);
@@ -78,10 +101,11 @@ const markModuleAsCompleted = async (req, res) => {
   }
 };
 
+
 const getUserProgressModules = async (req, res) => {
   try {
     logger.info('[getUserProgressModules] => Get progress modules started.');
-    const { user_id } = req.user;
+    const user_id = req.user._id;
 
     const progress = await Progress.findOne({ user_id })
       .populate('modules.module_id');
@@ -95,6 +119,10 @@ const getUserProgressModules = async (req, res) => {
       isCompleted: m.isCompleted,
       completedAt: m.completedAt,
     }));
+
+    if (modulesWithStatus.length === 0) {
+      return res.status(404).json({ message: `No modules found in progress for ${req.user.first_name} ${req.user.last_name}` });
+    } 
 
     logger.info('[getUserProgressModules] => Get progress modules done.');
     return res.status(200).json({
@@ -110,10 +138,14 @@ const getUserProgressModules = async (req, res) => {
 const removeModuleFromProgress = async (req, res) => {
   try {
     logger.info('[removeModuleFromProgress] => Remove module process started.');
-    const { user_id } = req.user;
+    const user_id = req.user._id;
     const { module_id } = req.body;
 
-    const progress = await Progress.findOne({ user_id, module_id });
+    if (!mongoose.Types.ObjectId.isValid(module_id)) {
+      return res.status(400).json({ message: 'Invalid module ID' });
+    }
+
+    const progress = await Progress.findOne({ user_id });
 
     if (!progress) {
       return res.status(404).json({ message: 'Progress not found' });
@@ -121,7 +153,7 @@ const removeModuleFromProgress = async (req, res) => {
 
     const initialCount = progress.modules.length;
     progress.modules = progress.modules.filter(
-      m => m.module_id.toString() !== module_id
+      (m) => m.module_id.toString() !== module_id
     );
 
     if (progress.modules.length === initialCount) {
@@ -133,13 +165,14 @@ const removeModuleFromProgress = async (req, res) => {
     logger.info('[removeModuleFromProgress] => Remove module process done.');
     return res.status(200).json({
       message: 'Module removed from progress',
-      data: progress
+      data: progress,
     });
   } catch (error) {
     console.error('[removeModuleFromProgress] => Error:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 
 

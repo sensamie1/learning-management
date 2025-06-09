@@ -70,10 +70,22 @@ const getModules = async (req, res) => {
 const getModulesById = async (req, res) => {
   try {
     logger.info('[GetModulesById] => Get process started.');
-    const { module_id } = req.query;
+    const { module_id } = req.params;
 
-    const module = await Module.find({ _id: module_id });
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(module_id)) {
+      return res.status(400).json({ message: 'Invalid module ID' });
+    }
 
+    // Use findById
+    const module = await Module.findById(module_id);
+    console.log(module_id);
+
+    if (!module) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+
+    logger.info('[GetModulesById] => Get process done.');
     return res.status(200).json({
       message: `Modules with ID: ${module_id} retrieved successfully`,
       data: module,
@@ -90,12 +102,17 @@ const getModulesById = async (req, res) => {
 const getModulesByPath = async (req, res) => {
   try {
     logger.info('[GetModulesByPath] => Get process started.');
-    const { path_id } = req.query;
+    const { path_id } = req.params;
 
     const modules = await Module.find({ learning_path_id: path_id });
 
+    if (!modules || modules.length === 0) {
+      return res.status(404).json({ message: 'No modules found for this learning path' })
+    }
+    
+    logger.info('[GetModulesByPath] => Get process done.');
     return res.status(200).json({
-      message: 'Modules for learning path retrieved successfully',
+      message: `Modules for learning path with ID: ${path_id} retrieved successfully`,
       data: modules,
     });
   } catch (err) {

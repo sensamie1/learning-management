@@ -58,7 +58,7 @@ router.post('/progress/add-module',
 )
 
 // User mark module as completed
-router.patch('/progress/mark-completed',
+router.patch('/progress/modules/mark-completed',
   globalMiddleware.bearerTokenAuth, 
   globalMiddleware.checkBody, 
   progressController.markModuleAsCompleted
