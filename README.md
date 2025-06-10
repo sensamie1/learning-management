@@ -72,7 +72,7 @@ JWT_SECRET=your_jwt_secret
 4. **Run server:**
 
 ```bash
-npm run dev
+npm run start:dev
 ```
 
 ---
